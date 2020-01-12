@@ -1,5 +1,5 @@
-author: mongoose-os
-description: Test scroll text using MD_MAX72XX library
+author: Michael Fung
+description: Test MD_MAX72XX library
 version: 1.0
 
 libs_version: ${mos.version}
@@ -20,6 +20,12 @@ filesystem:
   - fs
 
 config_schema:
+  - ["device.id", "testmax"]
+  - ["wifi.ap.enable", false]
+  - ["wifi.sta.enable", true]
+  - ["wifi.ap.keep_enabled", false]
+  - ["sntp.server", "192.168.0.254"]
+  - ["debug.udp_log_addr", "192.168.0.1:514"]
   - ["spi.enable", true]
   - ["spi.debug", true]
   # use VSPI:
@@ -31,12 +37,15 @@ config_schema:
   # - ["spi.cs1_gpio", "i", -1, {title: "GPIO to use for CS1"}]
   # - ["spi.cs2_gpio", "i", -1, {title: "GPIO to use for CS2"}]
 
-libs:
-  - origin: https://github.com/mongoose-os-libs/boards
-  - origin: https://github.com/mongoose-os-libs/ca-bundle
+libs:  
+  - origin: https://github.com/mongoose-os-libs/wifi
+  - origin: https://github.com/mongoose-os-libs/http-server
+  - origin: https://github.com/mongoose-os-libs/rpc-loopback
   - origin: https://github.com/mongoose-os-libs/rpc-service-config
   - origin: https://github.com/mongoose-os-libs/rpc-service-fs
   - origin: https://github.com/mongoose-os-libs/rpc-uart
+  - origin: https://github.com/mongoose-os-libs/ota-http-server  
+  - origin: https://github.com/mongoose-os-libs/mjs
   - origin: https://github.com/mongoose-os-libs/spi
   - origin: https://github.com/mongoose-os-libs/arduino-compat
   - origin: https://github.com/mongoose-os-libs/arduino-spi

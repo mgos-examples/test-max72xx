@@ -1,7 +1,4 @@
-# A blank Mongoose OS app
+## Test multiple md-max72xx library functions
 
-## Overview
-
-This is an empty app, serves as a skeleton for building Mongoose OS
-apps from scratch.
+Use a button to cycle through each functions
 

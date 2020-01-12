@@ -21,6 +21,10 @@
 #include <SPI.h>
 
 // #define LED_PIN 2
+#define MODE_CYCLE_PIN 33
+
+// for use with: void mgos_clear_timer(mgos_timer_id id);
+static mgos_timer_id scroll_timer_id = 0;
 
 #define USE_POT_CONTROL 0
 #define PRINT_CALLBACK 0
@@ -65,58 +69,58 @@ void printText(uint8_t modStart, uint8_t modEnd, char *pMsg)
 // Print the text string to the LED matrix modules specified.
 // Message area is padded with blank columns after printing.
 {
-  uint8_t   state = 0;
-  uint8_t   curLen = 0;
-  uint16_t  showLen = 0;
-  uint8_t   cBuf[8];
-  int16_t   col = ((modEnd + 1) * COL_SIZE) - 1;
+  uint8_t state = 0;
+  uint8_t curLen = 0;
+  uint16_t showLen = 0;
+  uint8_t cBuf[8];
+  int16_t col = ((modEnd + 1) * COL_SIZE) - 1;
 
   mx.control(modStart, modEnd, MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
 
-  do     // finite state machine to print the characters in the space available
+  do // finite state machine to print the characters in the space available
   {
-    switch(state)
+    switch (state)
     {
-      case 0: // Load the next character from the font table
-        // if we reached end of message, reset the message pointer
-        if (*pMsg == '\0')
-        {
-          showLen = col - (modEnd * COL_SIZE);  // padding characters
-          state = 2;
-          break;
-        }
-
-        // retrieve the next character form the font file
-        showLen = mx.getChar(*pMsg++, sizeof(cBuf)/sizeof(cBuf[0]), cBuf);
-        curLen = 0;
-        state++;
-        // !! deliberately fall through to next state to start displaying
-
-      case 1: // display the next part of the character
-        mx.setColumn(col--, cBuf[curLen++]);
-
-        // done with font character, now display the space between chars
-        if (curLen == showLen)
-        {
-          showLen = CHAR_SPACING;
-          state = 2;
-        }
+    case 0: // Load the next character from the font table
+      // if we reached end of message, reset the message pointer
+      if (*pMsg == '\0')
+      {
+        showLen = col - (modEnd * COL_SIZE); // padding characters
+        state = 2;
         break;
+      }
 
-      case 2: // initialize state for displaying empty columns
-        curLen = 0;
-        state++;
-        // fall through
+      // retrieve the next character form the font file
+      showLen = mx.getChar(*pMsg++, sizeof(cBuf) / sizeof(cBuf[0]), cBuf);
+      curLen = 0;
+      state++;
+      // !! deliberately fall through to next state to start displaying
 
-      case 3:	// display inter-character spacing or end of message padding (blank columns)
-        mx.setColumn(col--, 0);
-        curLen++;
-        if (curLen == showLen)
-          state = 0;
-        break;
+    case 1: // display the next part of the character
+      mx.setColumn(col--, cBuf[curLen++]);
 
-      default:
-        col = -1;   // this definitely ends the do loop
+      // done with font character, now display the space between chars
+      if (curLen == showLen)
+      {
+        showLen = CHAR_SPACING;
+        state = 2;
+      }
+      break;
+
+    case 2: // initialize state for displaying empty columns
+      curLen = 0;
+      state++;
+      // fall through
+
+    case 3: // display inter-character spacing or end of message padding (blank columns)
+      mx.setColumn(col--, 0);
+      curLen++;
+      if (curLen == showLen)
+        state = 0;
+      break;
+
+    default:
+      col = -1; // this definitely ends the do loop
     }
   } while (col >= (modStart * COL_SIZE));
 
@@ -146,9 +150,6 @@ uint8_t scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
   uint8_t colData = 0;
   static bool lastChar = false;
 
-  if (msgShown)
-    return 0; // dont scroll after shown
-
   // finite state machine to control what we do on the callback
   switch (state)
   {
@@ -161,7 +162,6 @@ uint8_t scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
     if (*p == '\0')
     {
       lastChar = true;
-
       p = curMessage;          // reset the pointer to start of message
       if (newMessageAvailable) // there is a new message waiting
       {
@@ -196,11 +196,7 @@ uint8_t scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
         msgShown = true;
       }
     }
-
-    else
-    {
-      break;
-    }
+    break;
 
   default:
     state = 0;
@@ -209,57 +205,89 @@ uint8_t scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
   return (colData);
 }
 
-void scrollText(void)
+static void scroll_left_cb(void *arg)
 {
-  static uint32_t prevTime = 0;
-
-  mx.transform(MD_MAX72XX::TSL); // scroll along - the callback will load all the data
+  mx.transform(MD_MAX72XX::TSL); // scroll left
+  (void)arg;
 }
 
-uint16_t getScrollDelay(void)
+static void scroll_up_cb(void *arg)
 {
-  return (SCROLL_DELAY);
+  static int count = 0;
+  if ( count++ < 8 ) {;
+    mx.transform(MD_MAX72XX::TSU); // scroll up
+  } else {
+    count = 0;
+    mgos_clear_timer(scroll_timer_id); // stop timer
+    strcpy(curMessage, "30%");
+    printText(0, MAX_DEVICES -1, curMessage);    
+  }
+  (void)arg;
 }
 
-static void timer_cb(void *arg)
+/* --- list of tests --- */
+
+static void testPrintText(const char *msg)
 {
-  /*   static bool s_tick_tock = false;
-  LOG(LL_INFO,
-      ("%s uptime: %.2lf, RAM: %lu, %lu free", (s_tick_tock ? "Tick" : "Tock"),
-       mgos_uptime(), (unsigned long)mgos_get_heap_size(),
-       (unsigned long)mgos_get_free_heap_size()));
-  s_tick_tock = !s_tick_tock; */
+  strcpy(curMessage, msg);
+  printText(0, MAX_DEVICES - 1, curMessage);
+}
 
-#ifdef LED_PIN
-  mgos_gpio_toggle(LED_PIN);
-#endif
+static void testScrollTextLeft(const char *msg)
+{
+  strcpy(curMessage, msg);
+  scroll_timer_id = mgos_set_timer(SCROLL_DELAY /* ms */, MGOS_TIMER_REPEAT, scroll_left_cb, NULL);
+}
 
-  if (msgShown)
-    return;
+static void testScrollTextUp(const char *msg)
+{
+  strcpy(curMessage, msg);
+  printText(0, MAX_DEVICES - 1, curMessage);
+  scroll_timer_id = mgos_set_timer(SCROLL_DELAY + 100 /* ms */, MGOS_TIMER_REPEAT, scroll_up_cb, NULL);
+}
 
-  scrollText();
+static int test_mode = -1;
+static void cycle_test_mode_cb(int pin, void *arg)
+{
+  test_mode = (test_mode + 1) % 3;
+  mgos_clear_timer(scroll_timer_id);
+  mx.clear();
+
+  switch (test_mode)
+  {
+  case 0: // testPrintText
+    testPrintText("RDY");
+    break;
+
+  case 2:
+    testScrollTextLeft("Scroll Left Test");
+    break;
+  
+  case 3:
+    testScrollTextUp("\x18" "UP");
+    break;
+
+  default:
+    test_mode = 0;
+    testPrintText("Rst");
+  }
 
   (void)arg;
 }
 
+/* --- finally, main entry --- */
 extern "C" enum mgos_app_init_result mgos_app_init(void)
 {
-
   mx.begin();
   mx.control(0, MAX_DEVICES - 1, MD_MAX72XX::INTENSITY, 0);
+  scrollDelay = SCROLL_DELAY;
   mx.setShiftDataInCallback(scrollDataSource);
   mx.setShiftDataOutCallback(scrollDataSink);
 
-  strcpy(curMessage, "OK    ");
-  printText(0, MAX_DEVICES-1, curMessage);
+  // default is testPrintText:
+  testPrintText("RDY");
 
-  scrollDelay = SCROLL_DELAY;
-  strcpy(curMessage, "HSBC 58.6");
-  newMessage[0] = '\0';
+  mgos_gpio_set_button_handler(MODE_CYCLE_PIN, MGOS_GPIO_PULL_UP, MGOS_GPIO_INT_EDGE_NEG, 100, cycle_test_mode_cb, NULL);
 
-#ifdef LED_PIN
-  mgos_gpio_setup_output(LED_PIN, 0);
-#endif
-  mgos_set_timer(SCROLL_DELAY /* ms */, MGOS_TIMER_REPEAT, timer_cb, NULL);
   return MGOS_APP_INIT_SUCCESS;
 }
