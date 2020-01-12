@@ -20,6 +20,22 @@
 #include <MD_MAX72xx.h>
 #include <SPI.h>
 
+const uint8_t bold_numeric_font[] = 
+{
+  'F', 1, 48, 57, 8,
+
+  7, 0x7c, 0xc6, 0xce, 0xde, 0xf6, 0xe6, 0x7c,  // 0030 (zero)
+  7, 0x30, 0x70, 0x30, 0x30, 0x30, 0x30, 0xfc,  // 0031 (one)
+  7, 0x78, 0xcc, 0x0c, 0x38, 0x60, 0xc4, 0xfc,  // 0032 (two)
+  7, 0x78, 0xcc, 0x0c, 0x38, 0x0c, 0xcc, 0x78,  // 0033 (three)
+  7, 0x1c, 0x3c, 0x6c, 0xcc, 0xfe, 0x0c, 0x1e,  // 0034 (four)
+  7, 0xfc, 0xc0, 0xf8, 0x0c, 0x0c, 0xcc, 0x78,  // 0035 (five)
+  7, 0x38, 0x60, 0xc0, 0xf8, 0xcc, 0xcc, 0x78,  // 0036 (six)
+  7, 0xfc, 0xcc, 0x0c, 0x18, 0x30, 0x30, 0x30,  // 0037 (seven)
+  7, 0x78, 0xcc, 0xcc, 0x78, 0xcc, 0xcc, 0x78,  // 0038 (eight)
+  7, 0x78, 0xcc, 0xcc, 0x7c, 0x0c, 0x18, 0x70,  // 0039 (nine)
+};
+
 // #define LED_PIN 2
 #define MODE_CYCLE_PIN 33
 
@@ -264,10 +280,22 @@ static void testRotate() {
   mx.update();
 }
 
+// custom font
+static void testCustomFont() {
+
+  mx.setFont(bold_numeric_font);
+  testSetChar();
+  mx.transform(MD_MAX72XX::TRC);
+  mx.update();
+
+  // reset to default font:
+  mx.setFont(nullptr);
+}
+
 static int test_mode = -1;
 static void cycle_test_mode_cb(int pin, void *arg)
 {
-  test_mode = (test_mode + 1) % 5;
+  test_mode = (test_mode + 1) % 6;
   mgos_clear_timer(scroll_timer_id);
   mx.clear();
 
@@ -291,6 +319,10 @@ static void cycle_test_mode_cb(int pin, void *arg)
 
   case 4:
     testRotate();
+    break;
+
+  case 5:
+    testCustomFont();
     break;
 
   default:
