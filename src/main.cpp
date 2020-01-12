@@ -246,10 +246,28 @@ static void testScrollTextUp(const char *msg)
   scroll_timer_id = mgos_set_timer(SCROLL_DELAY + 100 /* ms */, MGOS_TIMER_REPEAT, scroll_up_cb, NULL);
 }
 
+// show '28' using 2 device
+static void testSetChar() {
+  mx.update(MD_MAX72XX::OFF);
+
+  int leftmost_col = (MAX_DEVICES * 8) - 1;
+  int second_device_col = leftmost_col - 8;
+  mx.setChar(leftmost_col, 50); // '2'
+  mx.setChar(second_device_col, 56); // '8'
+  mx.update();
+}
+
+// rotate font
+static void testRotate() {
+  testSetChar();
+  mx.transform(MD_MAX72XX::TRC);
+  mx.update();
+}
+
 static int test_mode = -1;
 static void cycle_test_mode_cb(int pin, void *arg)
 {
-  test_mode = (test_mode + 1) % 3;
+  test_mode = (test_mode + 1) % 5;
   mgos_clear_timer(scroll_timer_id);
   mx.clear();
 
@@ -259,12 +277,20 @@ static void cycle_test_mode_cb(int pin, void *arg)
     testPrintText("RDY");
     break;
 
-  case 2:
+  case 1:
     testScrollTextLeft("Scroll Left Test");
     break;
   
-  case 3:
+  case 2:
     testScrollTextUp("\x18" "UP");
+    break;
+
+  case 3:
+    testSetChar();
+    break;
+
+  case 4:
+    testRotate();
     break;
 
   default:
